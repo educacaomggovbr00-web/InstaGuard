@@ -102,3 +102,28 @@ python report.py 1 --format json --output revisao-caso-1.json
 ```
 
 O JSON traz `identity_of_profile_creator.status: unknown`, `conclusion: inconclusive` e `public_fields_supplied_manually.independently_verified: false`. Mesmo quando o operador informa um nome de exibição, isso **não comprova o nome real de quem criou a conta**. Não há invasão, contorno de privacidade, busca de identidade oculta nem envio de denúncias.
+
+## Auditoria de segurança do próprio InstaGuard
+
+A auditoria é **local e defensiva**: verifica o arquivo SQLite do programa, sem acessar o Instagram nem consultar perfis de terceiros.
+
+```bash
+# Confira casos cadastrados, se necessário
+python instaguard.py list
+
+# Execute uma auditoria do banco padrão (~/.instaguard/cases.db)
+python security_audit.py
+
+# Obtenha a auditoria em JSON para registrar um teste de software
+python security_audit.py --format json > auditoria-instaguard.json
+
+# Caso use um banco diferente:
+python security_audit.py --db ./meus-casos.db --format json
+
+# Testes automatizados (também executados no GitHub Actions)
+python -m unittest discover -s tests -v
+```
+
+Os resultados verificam **integridade do banco SQLite**, referências órfãs, presença das tabelas essenciais e permissões de leitura por terceiros (em sistemas Unix/Termux). A auditoria é somente leitura, não imprime os casos, não altera arquivos e relata falhas sem fornecer dados pessoais. Um banco ainda não criado será informado como inexistente.
+
+**Proteção dos arquivos:** as exportações JSON de `instaguard.py export` e os relatórios de `report.py` são criados com permissões de acesso restrito nos sistemas compatíveis e não sobrescrevem arquivos existentes. A ferramenta não certifica segurança de serviços externos, não detecta todas as vulnerabilidades e não revela identidades privadas.
