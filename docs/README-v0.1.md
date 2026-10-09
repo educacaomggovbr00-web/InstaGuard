@@ -92,3 +92,13 @@ python -m unittest discover -s tests -v
 ```
 
 O relatório **não acessa redes sociais**, não investiga a identidade privada do proprietário, não atribui culpabilidade, não envia denúncias e não certifica a veracidade das informações inseridas. A identidade de quem criou ou administra o perfil é registrada como **não determinada**. O comando se recusa a sobrescrever um relatório existente e protege os arquivos de saída, quando o sistema suporta permissões Unix.
+
+## Relatório estruturado JSON (teste de software)
+
+A análise de casos pode ser exportada também como JSON, com campos que indicam explicitamente as limitações e o nível de verificação. **Não é necessário usar a internet para executar o comando.**
+
+```bash
+python report.py 1 --format json --output revisao-caso-1.json
+```
+
+O JSON traz `identity_of_profile_creator.status: unknown`, `conclusion: inconclusive` e `public_fields_supplied_manually.independently_verified: false`. Mesmo quando o operador informa um nome de exibição, isso **não comprova o nome real de quem criou a conta**. Não há invasão, contorno de privacidade, busca de identidade oculta nem envio de denúncias.
