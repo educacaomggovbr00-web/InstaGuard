@@ -10,7 +10,7 @@ import json
 import re
 from urllib.parse import urlparse
 
-from instaguard import clean_username
+from instaguard import check_url, clean_username
 
 LINK_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 SUSPICIOUS_CLAIMS = (
@@ -31,9 +31,17 @@ def assess(username, display_name="", bio="", source_url=""):
     if len(display_name) > 120 or len(bio) > 2200:
         raise ValueError("Nome ou biografia acima do limite permitido.")
     if source_url:
+        check_url(source_url)
+    consistency = "missing_source"
+    if source_url:
         parsed = urlparse(source_url)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("A fonte precisa ser uma URL HTTPS válida, sem credenciais.")
+        consistency = "external_source_unverified"
+        if parsed.hostname in ("instagram.com", "www.instagram.com"):
+            try:
+                source_user = clean_username(source_url)
+                consistency = "matching_profile" if source_user.lower() == user.lower() else "profile_mismatch"
+            except ValueError:
+                consistency = "not_a_profile_url"
     signals = [
         {"indicator": name, "excerpt": match.group(0)}
         for name, pattern in SUSPICIOUS_CLAIMS
@@ -46,6 +54,10 @@ def assess(username, display_name="", bio="", source_url=""):
         "display_name_reported": display_name,
         "bio_reported": bio,
         "source_url": source_url,
+        "provenance": {"source_consistency": consistency,
+                       "independently_verified": False,
+                       "reliability": "operator_claim_only",
+                       "note": "Matching a URL does not verify its content."},
         "links_in_bio": links,
         "review_indicators": signals,
         "conclusion": "Revisão humana necessária. Indicadores não comprovam fraude.",
@@ -71,3 +83,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

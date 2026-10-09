@@ -11,10 +11,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import secrets
+import sqlite3
 from urllib.parse import parse_qs, urlparse
 
 from instaguard import CATEGORIES, DEFAULT_DB, STATUSES, check_url, clean_username, connect, get_case, require_case, timestamp
-from report import make_report
+from report import make_report, make_json_report
+from evidence import register_evidence
 from submission import OFFICIAL_HELP_URL, prepare_statement
 from scripts.simulate_load import simulate
 
@@ -143,6 +145,7 @@ def case_page(db, case_id, token, notice=""):
 <a href="https://www.instagram.com/{e(case["username"])}/" target="_blank" rel="noopener noreferrer">Abrir perfil no Instagram ↗</a>
 <p>{e(case["reason"])}</p>
 <a class="btn secondary" href="/case/{case_id}/report">Baixar relatório Markdown</a>
+<a class="btn secondary" href="/case/{case_id}/report.json">Baixar relatório JSON</a>
 <a class="btn" href="/case/{case_id}/prepare">Preparar denúncia manual</a></section>
 <div class="grid"><div><section class="panel"><h2>Evidências</h2>{evidence}</section></div>
 <div><section class="panel"><h2>Adicionar evidência</h2>
@@ -150,6 +153,8 @@ def case_page(db, case_id, token, notice=""):
 <input type="hidden" name="csrf" value="{token}">
 <label>URL HTTPS</label><input name="url" type="url" required placeholder="https://...">
 <label>Descrição</label><textarea name="description" maxlength="2000" required></textarea>
+<label>Data da observação (ISO 8601 com fuso, opcional)</label><input name="observed_at" placeholder="2026-10-09T10:00:00Z">
+<label>Identificação do operador (opcional)</label><input name="collector" maxlength="120">
 <button type="submit">Salvar evidência</button></form></section>
 <section class="panel"><h2>Andamento manual</h2>
 <form action="/case/{case_id}/status" method="post">
@@ -178,6 +183,17 @@ def prepare_page(db, case_id):
 
 def create_handler(db_path, token):
     class Handler(BaseHTTPRequestHandler):
+        def local_request(self):
+            expected = f"127.0.0.1:{self.server.server_port}"
+            if self.headers.get("Host") not in (expected, f"localhost:{self.server.server_port}"):
+                self.respond(403, b"Invalid Host", "text/plain")
+                return False
+            origin = self.headers.get("Origin")
+            if origin and origin not in ("http://" + expected, f"http://localhost:{self.server.server_port}"):
+                self.respond(403, b"Invalid Origin", "text/plain")
+                return False
+            return True
+
         def respond(self, status, data, content_type="text/html; charset=utf-8", filename=None):
             self.send_response(status)
             self.send_header("Content-Type", content_type)
@@ -192,6 +208,8 @@ def create_handler(db_path, token):
             self.wfile.write(data)
 
         def do_GET(self):
+            if not self.local_request():
+                return
             path = urlparse(self.path).path
             try:
                 db = connect(db_path)
@@ -218,13 +236,24 @@ def create_handler(db_path, token):
                             markdown = make_report(get_case(db, cid)).encode("utf-8")
                             self.respond(200, markdown, "text/markdown; charset=utf-8", f"instaguard-caso-{cid}.md")
                             return
+                        if len(parts) == 3 and parts[2] == "report.json":
+                            payload = json.dumps(make_json_report(get_case(db, cid)), ensure_ascii=False, indent=2).encode("utf-8")
+                            self.respond(200, payload, "application/json; charset=utf-8", f"instaguard-caso-{cid}.json")
+                            return
                 finally:
                     db.close()
                 self.respond(404, layout("Não encontrado", "<h1>Página não encontrada</h1>"))
             except ValueError as exc:
                 self.respond(404, layout("Caso não encontrado", f"<h1>{e(exc)}</h1>", error=True))
+            except (OSError, sqlite3.Error):
+                self.respond(500, layout("Erro", "<h1>Banco local indisponível.</h1>"))
 
         def do_POST(self):
+            if not self.local_request():
+                return
+            if self.headers.get_content_type() != "application/x-www-form-urlencoded":
+                self.respond(415, b"Unsupported form encoding", "text/plain")
+                return
             size = self.headers.get("Content-Length", "")
             if not size.isdigit() or int(size) > 16_384:
                 self.respond(413, layout("Erro", "<h1>Formulário inválido ou muito grande.</h1>"))
@@ -263,16 +292,8 @@ def create_handler(db_path, token):
                     cid = int(parts[1])
                     require_case(db, cid)
                     if parts[2] == "evidence":
-                        url = check_url(field("url"))
-                        description = field("description")
-                        if not description or len(description) > 2000:
-                            raise ValueError("Descrição inválida.")
-                        now = timestamp()
-                        db.execute(
-                            "INSERT INTO evidence(case_id,url,description,created_at) VALUES(?,?,?,?)",
-                            (cid, url, description, now)
-                        )
-                        db.execute("UPDATE cases SET updated_at=? WHERE id=?", (now, cid))
+                        register_evidence(db, cid, field("url"), field("description"),
+                                          observed_at=field("observed_at"), collector=field("collector"))
                     elif parts[2] == "status":
                         status = field("status")
                         if status not in STATUSES:
@@ -287,6 +308,8 @@ def create_handler(db_path, token):
                 self.respond(404, layout("Não encontrado", "<h1>Ação não encontrada</h1>"))
             except ValueError as exc:
                 self.respond(400, layout("Erro", "<h1>Não foi possível salvar</h1>", str(exc), True))
+            except (OSError, sqlite3.Error):
+                self.respond(500, layout("Erro", "<h1>Banco local indisponível.</h1>"))
             finally:
                 if db is not None:
                     db.close()
@@ -318,3 +341,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+

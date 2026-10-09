@@ -7,3 +7,6 @@ __pycache__/
 relatorio*.json
 .coverage
 .pytest_cache/
+evidence-files/
+manual-review-package/
+

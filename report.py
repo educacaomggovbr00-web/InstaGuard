@@ -10,6 +10,9 @@ import os
 from pathlib import Path
 import re
 import sys
+import sqlite3
+
+from evidence import verify_evidence
 
 from instaguard import DEFAULT_DB, connect, get_case, timestamp
 from investigator import assess
@@ -17,7 +20,8 @@ from investigator import assess
 
 def safe_text(value):
     """Escapa conteúdo informado pelo usuário para evitar Markdown enganoso."""
-    value = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    value = str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
     return re.sub(r"([\\\\`*_{}\[\]()#+.!|>~-])", r"\\\1", value).replace("\n", "  \n")
 
 
@@ -80,6 +84,19 @@ def make_report(case, display_name="", bio="", source_url=""):
     else:
         lines.append("Nenhuma evidência cadastrada.")
     lines.extend([
+        "", "## Verificação e procedência", "",
+        "Fatos confirmados abaixo dizem respeito somente aos arquivos locais; hashes não comprovam autoria ou veracidade.",
+        f"Consistência da fonte: {mark(info['provenance']['source_consistency'])}",
+    ])
+    structured = make_json_report(case, display_name, bio, source_url)
+    for heading, key in (("Fatos confirmados", "confirmed_facts"),
+                         ("Informações não verificadas", "unverified_information"),
+                         ("Resultados inconclusivos", "inconclusive_results")):
+        lines.extend(["", "### " + heading, ""])
+        lines.extend("- " + mark(json.dumps(item, ensure_ascii=False)) for item in structured[key])
+        if not structured[key]:
+            lines.append("Nenhum.")
+    lines.extend([
         "",
         "## Conclusão",
         "",
@@ -97,8 +114,12 @@ def make_json_report(case, display_name="", bio="", source_url=""):
     info = assess(
         case["username"], display_name=display_name, bio=bio, source_url=source_url
     )
+    checks = [verify_evidence(item) for item in case["evidence"]]
+    confirmed = [check for check in checks if check["status"] == "verified_bytes"]
+    inconclusive = [check for check in checks if check["status"] in ("mismatch", "unavailable")]
+    inconclusive.append({"subject": "profile_authorship_and_violation", "status": "not_established"})
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at_utc": timestamp(),
         "mode": "offline_manual_review",
         "case": {
@@ -116,6 +137,23 @@ def make_json_report(case, display_name="", bio="", source_url=""):
         },
         "review_indicators": info["review_indicators"],
         "evidence_supplied_by_operator": case["evidence"],
+        "provenance": info["provenance"],
+        "integrity_checks": checks,
+        "confirmed_facts": confirmed,
+        "unverified_information": [
+            {"subject": "operator_reason", "value": case["reason"]},
+            {"subject": "public_fields", "display_name": display_name, "bio": bio},
+            *[{"subject": "evidence_content", "evidence_id": item.get("id"),
+               "url": item["url"], "description": item["description"]} for item in case["evidence"]],
+        ],
+        "inconclusive_results": inconclusive,
+        "timeline": sorted([
+            {"event": "evidence_registered", "evidence_id": item.get("id"), "at_utc": item["created_at"]}
+            for item in case["evidence"] if item.get("created_at")
+        ] + [
+            {"event": "observation_claimed_by_operator", "evidence_id": item.get("id"), "at_utc": item["observed_at"]}
+            for item in case["evidence"] if item.get("observed_at")
+        ], key=lambda item: item["at_utc"]),
         "identity_of_profile_creator": {
             "status": "unknown",
             "note": "Nome de exibição não identifica quem criou ou controla uma conta."
@@ -169,10 +207,11 @@ def main(argv=None):
         else:
             print(report)
         return 0
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, sqlite3.Error) as exc:
         print(f"Erro: {exc}", file=sys.stderr)
         return 1
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

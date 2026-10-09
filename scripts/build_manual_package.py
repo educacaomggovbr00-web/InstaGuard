@@ -4,6 +4,7 @@
 Aceita dados fornecidos pelo operador; não usa redes, cookies ou credenciais.
 """
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -39,12 +40,13 @@ def main(argv=None):
     try:
         case = build_case(args.profile_url, args.category, args.reason, args.evidence_urls)
         dest = Path(args.output_dir)
-        dest.mkdir(parents=True, exist_ok=True)
+        # A new directory avoids partial overwrite of an earlier review package.
+        dest.mkdir(parents=True, exist_ok=False, mode=0o700)
         file = dest / "revisao-manual.txt"
         # Não substitui arquivo anterior; evita alterações silenciosas.
-        with file.open("x", encoding="utf-8") as out:
+        with os.fdopen(os.open(file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf-8") as out:
             out.write(prepare_statement(case) + "\n")
-        with (dest / "LEIA-ME.txt").open("x", encoding="utf-8") as out:
+        with os.fdopen(os.open(dest / "LEIA-ME.txt", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf-8") as out:
             out.write(
                 "Pacote de revisão manual — InstaGuard\n"
                 "Nenhuma denúncia foi enviada. Nenhuma informação foi verificada.\n"
@@ -60,3 +62,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

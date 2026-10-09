@@ -12,7 +12,8 @@ import sqlite3
 import stat
 import sys
 
-from instaguard import DEFAULT_DB
+from instaguard import CATEGORIES, DEFAULT_DB, STATUSES, check_url
+from evidence import verify_evidence
 
 
 def audit_database(database_path):
@@ -75,7 +76,32 @@ def audit_database(database_path):
                     )
                 }
                 if {"cases", "evidence"}.issubset(tables):
-                    add("schema", "pass", "Tabelas essenciais presentes.")
+                    expected = {
+                        "cases": {"id", "username", "category", "reason", "status", "created_at", "updated_at"},
+                        "evidence": {"id", "case_id", "url", "description", "created_at"},
+                    }
+                    valid = all(columns.issubset({r[1] for r in db.execute(f"PRAGMA table_info({table})")})
+                                for table, columns in expected.items())
+                    add("schema", "pass" if valid else "fail", "Estrutura das colunas essenciais verificada.")
+                    if valid:
+                        invalid = db.execute(
+                            "SELECT COUNT(*) FROM cases WHERE category NOT IN (?,?,?,?) OR status NOT IN (?,?,?,?)",
+                            (*CATEGORIES, *STATUSES),
+                        ).fetchone()[0]
+                        add("case_values", "fail" if invalid else "pass", "Categorias e estados conferidos.")
+                        bad_urls = 0
+                        for row in db.execute("SELECT url FROM evidence"):
+                            try:
+                                check_url(row[0])
+                            except (ValueError, TypeError):
+                                bad_urls += 1
+                        add("evidence_urls", "fail" if bad_urls else "pass", "Formato das URLs conferido, sem consultar seu conteúdo.")
+                        columns = {r[1] for r in db.execute("PRAGMA table_info(evidence)")}
+                        if {"artifact_path", "sha256", "size_bytes"}.issubset(columns):
+                            db.row_factory = sqlite3.Row
+                            artifacts = [dict(row) for row in db.execute("SELECT * FROM evidence WHERE artifact_path IS NOT NULL")]
+                            failed = any(verify_evidence(row)["status"] != "verified_bytes" for row in artifacts)
+                            add("artifact_integrity", "fail" if failed else "pass", "Integridade SHA-256 das cópias locais conferida.")
                 else:
                     add("schema", "fail", "Uma ou mais tabelas essenciais estão ausentes.")
         except (sqlite3.Error, OSError, ValueError) as exc:
@@ -115,3 +141,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
+

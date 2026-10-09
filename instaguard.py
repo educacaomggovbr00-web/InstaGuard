@@ -42,11 +42,16 @@ def clean_username(value):
         value = value.lstrip("@")
     if not USERNAME.fullmatch(value):
         raise ValueError("Use @usuario ou https://www.instagram.com/usuario/")
+    if value.lower() in {"p", "reel", "reels", "stories", "explore", "accounts", "direct"}:
+        raise ValueError("Reserved Instagram route, not a profile username.")
     return value
 
 
 def check_url(value):
+    if not value or value != value.strip() or any(ord(c) < 33 for c in value) or "\\" in value:
+        raise ValueError("Evidence URL contains whitespace or invalid characters.")
     parsed = urlparse(value)
+    parsed.port  # Validate malformed or out-of-range ports.
     if parsed.scheme != "https" or not parsed.hostname:
         raise ValueError("Evidence must have a valid https:// URL.")
     if parsed.username or parsed.password:
@@ -56,6 +61,8 @@ def check_url(value):
 
 def connect(path):
     path = Path(path).expanduser()
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError("Database must be a regular file, not a symbolic link.")
     parent_was_present = path.parent.exists()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     # Nunca altere permissões de diretórios já existentes de terceiros
@@ -65,8 +72,18 @@ def connect(path):
             path.parent.chmod(0o700)
         except OSError:
             pass
+    # Create the file privately before SQLite initializes its contents.
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        if path.is_symlink():
+            raise ValueError("Database symbolic link refused.")
+    else:
+        os.close(fd)
     connection = sqlite3.connect(str(path))
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute("BEGIN IMMEDIATE")
     connection.execute("""
         CREATE TABLE IF NOT EXISTS cases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,7 +104,12 @@ def connect(path):
             created_at TEXT NOT NULL
         )
     """)
-    connection.execute("PRAGMA foreign_keys=ON")
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(evidence)")}
+    for name in ("observed_at", "collector", "method", "artifact_path", "sha256"):
+        if name not in columns:
+            connection.execute(f"ALTER TABLE evidence ADD COLUMN {name} TEXT")
+    if "size_bytes" not in columns:
+        connection.execute("ALTER TABLE evidence ADD COLUMN size_bytes INTEGER")
     connection.commit()
     try:
         path.chmod(0o600)
@@ -107,7 +129,7 @@ def get_case(db, case_id):
     item = dict(require_case(db, case_id))
     item["evidence"] = [
         dict(row) for row in db.execute(
-            "SELECT id, url, description, created_at FROM evidence "
+            "SELECT * FROM evidence "
             "WHERE case_id = ? ORDER BY id", (case_id,)
         )
     ]
@@ -136,6 +158,9 @@ def parser():
     evidence.add_argument("id", type=int)
     evidence.add_argument("--url", required=True)
     evidence.add_argument("--description", required=True)
+    evidence.add_argument("--file", help="Legitimately obtained local screenshot or document")
+    evidence.add_argument("--observed-at", help="Observation time in ISO 8601, with timezone")
+    evidence.add_argument("--collector", default="", help="Operator label; do not supply secrets")
 
     status = sub.add_parser("status", help="Manually update a case")
     status.add_argument("id", type=int)
@@ -150,8 +175,9 @@ def parser():
 
 def main(argv=None):
     args = parser().parse_args(argv)
-    db = connect(args.db)
+    db = None
     try:
+        db = connect(args.db)
         if args.command == "add":
             username = clean_username(args.username)
             reason = args.reason.strip()
@@ -183,20 +209,9 @@ def main(argv=None):
         elif args.command == "show":
             print(json.dumps(get_case(db, args.id), ensure_ascii=False, indent=2))
         elif args.command == "evidence":
-            require_case(db, args.id)
-            url = check_url(args.url)
-            description = args.description.strip()
-            if not description:
-                raise ValueError("Evidence description cannot be empty.")
-            db.execute(
-                "INSERT INTO evidence (case_id, url, description, created_at) "
-                "VALUES (?, ?, ?, ?)",
-                (args.id, url, description, timestamp()),
-            )
-            db.execute(
-                "UPDATE cases SET updated_at = ? WHERE id = ?", (timestamp(), args.id)
-            )
-            db.commit()
+            from evidence import register_evidence
+            register_evidence(db, args.id, args.url, args.description,
+                              args.file, args.observed_at, args.collector)
             print(f"Added evidence to case #{args.id}.")
         elif args.command == "status":
             require_case(db, args.id)
@@ -238,8 +253,10 @@ def main(argv=None):
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

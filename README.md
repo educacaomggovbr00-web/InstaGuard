@@ -6,6 +6,31 @@ Ferramenta em Python para cadastrar perfis suspeitos, organizar evidências, ger
 
 A versão 0.1 está em desenvolvimento. Código e testes disponíveis nesta branch.
 
+## Evidências preservadas e relatórios verificáveis
+
+Registre uma captura ou documento que você obteve legitimamente. O programa copia os
+bytes para `evidence-files/`, ao lado do banco, com permissões privadas e calcula SHA-256:
+
+```bash
+python instaguard.py evidence 1 --url "https://www.instagram.com/perfil.exemplo/" --description "Captura fornecida por mim" --file ./captura.png --observed-at "2026-10-09T10:00:00Z" --collector "operador"
+python report.py 1 --format md --output caso-1.md
+python report.py 1 --format json --output caso-1.json
+python security_audit.py --format json
+```
+
+Os relatórios separam fatos confirmados sobre os bytes locais, informações não
+verificadas e resultados inconclusivos. Alteração ou ausência de uma cópia é detectada
+na geração do relatório. SHA-256 não comprova autoria, identidade ou veracidade da
+imagem. O investigador também indica fontes ausentes, divergentes ou de outro site.
+No painel há downloads em Markdown e JSON; arquivos locais são anexados pela CLI.
+
+Limite por arquivo: 25 MiB. A data deve ter fuso horário e não pode ser futura.
+Evidências antigas por URL continuam disponíveis após migração automática do banco.
+Faça backup conjunto do banco e de `evidence-files/`; exportar JSON não inclui os
+arquivos binários. Os dados não são criptografados.
+
+Veja o [relatório de implementação e validação](docs/VALIDATION.md).
+
 ## Teste artificial de carga (10.000 eventos)
 
 O GitHub Actions executa uma simulação local com 10.000 eventos fictícios, **sem enviar denúncias reais**. Para executar no Termux:
@@ -39,3 +64,4 @@ Nenhum disparo de denúncias em massa, uso de contas automáticas ou envio para 
 No painel, o campo **Link completo ou @usuário do Instagram** aceita, por exemplo, `https://www.instagram.com/perfil/` ou `@perfil`. O InstaGuard reconhece apenas URLs HTTPS de perfil no domínio Instagram e rejeita links de posts ou sites externos. O perfil pode ser aberto no Instagram para avaliação humana.
 
 **Online não significa envio automatizado:** o cadastro e a preparação ocorrem no dispositivo, e a denúncia oficial deve ser feita manualmente no Instagram. Este projeto não está hospedado em um servidor público.
+
