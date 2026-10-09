@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 from instaguard import CATEGORIES, DEFAULT_DB, STATUSES, check_url, clean_username, connect, get_case, require_case, timestamp
 from report import make_report
+from submission import OFFICIAL_HELP_URL, prepare_statement
 from scripts.simulate_load import simulate
 
 CSS = """
@@ -120,7 +121,8 @@ def case_page(db, case_id, token, notice=""):
 <section class="hero"><h1>@{e(case["username"])}</h1>
 <p>Caso #{case["id"]} · {e(case["category"])} · {e(case["status"])}</p>
 <p>{e(case["reason"])}</p>
-<a class="btn secondary" href="/case/{case_id}/report">Baixar relatório Markdown</a></section>
+<a class="btn secondary" href="/case/{case_id}/report">Baixar relatório Markdown</a>
+<a class="btn" href="/case/{case_id}/prepare">Preparar denúncia manual</a></section>
 <div class="grid"><div><section class="panel"><h2>Evidências</h2>{evidence}</section></div>
 <div><section class="panel"><h2>Adicionar evidência</h2>
 <form action="/case/{case_id}/evidence" method="post">
@@ -136,6 +138,21 @@ def case_page(db, case_id, token, notice=""):
 <p>Marcar “reported” só registra informação inserida por você; não envia denúncia.</p>
 </section></div></div>"""
     return layout(f"Caso #{case_id}", body, notice)
+
+
+def prepare_page(db, case_id):
+    case = get_case(db, case_id)
+    draft = prepare_statement(case)
+    body = f"""<p><a href="/case/{case_id}">← Voltar ao caso</a></p>
+<section class="hero"><h1>Preparar solicitação de revisão</h1>
+<p>Confira cada alegação e evidência antes de usar este texto. Nenhuma denúncia foi enviada.</p>
+<a class="btn secondary" href="{OFFICIAL_HELP_URL}" target="_blank" rel="noopener noreferrer">Abrir Central de Ajuda do Instagram ↗</a></section>
+<section class="panel"><h2>Texto preparado</h2>
+<label for="draft">Selecione e copie para o canal oficial, caso as informações sejam verdadeiras.</label>
+<textarea id="draft" readonly rows="16" style="min-height:320px">{e(draft)}</textarea>
+<p>O canal oficial poderá solicitar informações adicionais. Este painel não acessa contas ou serviços externos.</p>
+</section>"""
+    return layout(f"Preparar caso #{case_id}", body)
 
 
 def create_handler(db_path, token):
@@ -166,6 +183,9 @@ def create_handler(db_path, token):
                         cid = int(parts[1])
                         if len(parts) == 2:
                             self.respond(200, case_page(db, cid, token))
+                            return
+                        if len(parts) == 3 and parts[2] == "prepare":
+                            self.respond(200, prepare_page(db, cid))
                             return
                         if len(parts) == 3 and parts[2] == "report":
                             markdown = make_report(get_case(db, cid)).encode("utf-8")
