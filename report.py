@@ -6,6 +6,7 @@ inferência da identidade de quem opera um perfil.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -158,12 +159,12 @@ def main(argv=None):
             destination = Path(args.output).expanduser()
             if destination.resolve() == Path(args.db).expanduser().resolve():
                 raise ValueError("Relatório não pode sobrescrever o banco SQLite.")
-            with destination.open("x", encoding="utf-8") as output:
+            # A escrita nasce com permissões privadas e nunca substitui arquivo existente.
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            with os.fdopen(
+                os.open(destination, flags, 0o600), "w", encoding="utf-8"
+            ) as output:
                 output.write(report)
-            try:
-                destination.chmod(0o600)
-            except OSError:
-                pass
             print(f"Relatório salvo em: {destination}")
         else:
             print(report)
