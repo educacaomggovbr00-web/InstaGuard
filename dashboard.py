@@ -118,7 +118,7 @@ def dashboard(db, token, notice=""):
 <section class="panel"><h2>Casos recentes</h2>{cards}</section></div>
 <div>{picker}<section class="panel"><h2>+ Novo caso</h2>
 <form method="post" action="/cases"><input type="hidden" name="csrf" value="{token}">
-<label>Usuário do perfil</label><input name="username" placeholder="@perfil.exemplo" maxlength="31" required>
+<label>Link completo ou @usuário do Instagram</label><input name="username" placeholder="https://www.instagram.com/perfil/" maxlength="255" required>
 <label>Categoria</label><select name="category">{select_options(CATEGORIES)}</select>
 <label>Motivo observado</label><textarea name="reason" maxlength="2000" required placeholder="Descreva fatos verificáveis, sem acusações não confirmadas"></textarea>
 <button type="submit">Cadastrar caso</button></form></section>
@@ -140,6 +140,7 @@ def case_page(db, case_id, token, notice=""):
     body = f"""<p><a href="/">← Voltar ao painel</a></p>
 <section class="hero"><h1>@{e(case["username"])}</h1>
 <p>Caso #{case["id"]} · {e(case["category"])} · {e(case["status"])}</p>
+<a href="https://www.instagram.com/{e(case["username"])}/" target="_blank" rel="noopener noreferrer">Abrir perfil no Instagram ↗</a>
 <p>{e(case["reason"])}</p>
 <a class="btn secondary" href="/case/{case_id}/report">Baixar relatório Markdown</a>
 <a class="btn" href="/case/{case_id}/prepare">Preparar denúncia manual</a></section>
