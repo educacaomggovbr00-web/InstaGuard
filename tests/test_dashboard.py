@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 from dashboard import case_page, dashboard, layout
-from instaguard import connect, timestamp
+from instaguard import clean_username, connect, timestamp
 from scripts.simulate_load import simulate
 
 
@@ -48,6 +48,27 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('action="/prepare"', page)
         self.assertIn('@perfil_teste', page)
         self.assertIn("Selecionar perfil para revisão", page)
+
+    def test_complete_instagram_profile_url(self):
+        self.assertEqual(
+            clean_username("https://www.instagram.com/melancoolics/"),
+            "melancoolics",
+        )
+        self.assertEqual(clean_username("@melancoolics"), "melancoolics")
+        for invalid in (
+            "https://evil.example/melancoolics/",
+            "https://www.instagram.com/p/abcd/",
+            "http://www.instagram.com/melancoolics/",
+            "https://www.instagram.com/melancoolics/?fake=true",
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    clean_username(invalid)
+
+    def test_dashboard_offers_full_url(self):
+        page = dashboard(self.db, "token").decode("utf-8")
+        self.assertIn("Link completo ou @usuário", page)
+        self.assertIn("https://www.instagram.com/perfil/", page)
 
     def test_simulation_is_offline_only(self):
         result = simulate(10_000)
