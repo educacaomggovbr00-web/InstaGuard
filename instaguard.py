@@ -25,9 +25,23 @@ def timestamp():
 
 
 def clean_username(value):
-    value = value.strip().lstrip("@")
+    """Accept @username or a complete, canonical Instagram profile URL."""
+    value = value.strip()
+    if value.startswith(("https://", "http://")):
+        parsed = urlparse(value)
+        if (parsed.scheme != "https" or
+                parsed.hostname not in ("instagram.com", "www.instagram.com") or
+                parsed.port is not None or parsed.username or parsed.password or
+                parsed.query or parsed.fragment):
+            raise ValueError("Use um link HTTPS de perfil do Instagram sem parâmetros.")
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) != 1:
+            raise ValueError("Use o link de um perfil, não de uma publicação ou reel.")
+        value = parts[0]
+    else:
+        value = value.lstrip("@")
     if not USERNAME.fullmatch(value):
-        raise ValueError("Use an Instagram username (1-30 letters, numbers, . or _).")
+        raise ValueError("Use @usuario ou https://www.instagram.com/usuario/")
     return value
 
 
