@@ -77,5 +77,32 @@ class ReportTests(unittest.TestCase):
         self.assertIn("\\*\\*Nome\\*\\*", output)
 
 
+    def test_machine_readable_report_does_not_claim_private_identity(self):
+        import json
+        code, output, error = self.run_report(
+            "--format", "json",
+            "--display-name", "Nome exibido",
+            "--source", "https://www.instagram.com/conta.exemplo/",
+        )
+        self.assertEqual((code, error), (0, ""))
+        data = json.loads(output)
+        self.assertEqual(data["mode"], "offline_manual_review")
+        self.assertEqual(data["conclusion"], "inconclusive")
+        self.assertEqual(data["identity_of_profile_creator"]["status"], "unknown")
+        self.assertIs(data["public_fields_supplied_manually"]["independently_verified"], False)
+        self.assertEqual(data["public_fields_supplied_manually"]["display_name"], "Nome exibido")
+        self.assertEqual(data["case"]["username"], "conta.exemplo")
+
+    def test_json_report_saved_without_overwriting(self):
+        import json
+        destination = Path(self.folder.name) / "case.json"
+        self.assertEqual(
+            self.run_report("--format", "json", "--output", str(destination))[0], 0
+        )
+        data = json.loads(destination.read_text(encoding="utf-8"))
+        self.assertEqual(data["case"]["id"], 1)
+        self.assertEqual(self.run_report("--format", "json", "--output", str(destination))[0], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
