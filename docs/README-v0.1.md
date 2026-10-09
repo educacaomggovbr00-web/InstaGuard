@@ -62,3 +62,13 @@ python -m unittest discover -s tests -v
 ## Licença
 
 Nenhuma licença de código aberto foi concedida. Todos os direitos reservados por padrão.
+
+## Investigador de dados públicos (experimental)
+
+O investigador analisa **apenas informações fornecidas manualmente**. Não busca perfis, não consulta APIs do Instagram e não identifica o verdadeiro criador de uma conta.
+
+```bash
+python investigator.py @perfil.exemplo --display-name "Nome visível" --bio "Texto público da biografia" --source "https://www.instagram.com/perfil.exemplo/"
+```
+
+A saída JSON inclui os dados registrados, links no texto e algumas expressões que merecem revisão humana (ex.: promessas financeiras). Nenhum sinal é prova de fraude e a análise não provoca denúncias ou bloqueios. Evite incluir dados pessoais que não estejam disponíveis legitimamente.
