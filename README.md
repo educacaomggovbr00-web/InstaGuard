@@ -27,3 +27,9 @@ python dashboard.py
 Abra **http://127.0.0.1:8765/** no navegador **do mesmo dispositivo**. Você pode cadastrar casos, adicionar evidências por URL, acompanhar status manualmente, baixar um relatório Markdown e executar o teste de 10.000 eventos **fictícios**. Use `Ctrl+C` para encerrar.
 
 O servidor só escuta em `127.0.0.1`; ele não expõe uma interface pública, não consulta Instagram e não envia denúncias. Os dados ficam em `~/.instaguard/cases.db`. Não use o painel com dados de pessoas obtidos de forma indevida.
+
+## Preparação de denúncia manual
+
+Abra um caso no painel e escolha **Preparar denúncia manual**. O programa cria um rascunho a partir do motivo e das evidências previamente fornecidos por você. Revise todas as afirmações antes de copiar o texto para um canal oficial. O botão **Abrir Central de Ajuda do Instagram** leva à página oficial de ajuda; isso não garante um formulário específico nem envia nada automaticamente.
+
+Nenhum disparo de denúncias em massa, uso de contas automáticas ou envio para perfis é implementado.
