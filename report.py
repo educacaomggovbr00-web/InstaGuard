@@ -21,7 +21,7 @@ def safe_text(value):
 
 def inline_code(value):
     """Texto seguro em marcação inline sem alterar endereços URL."""
-    return str(value).replace("`", "").replace("\\r", " ").replace("\\n", " ")
+    return str(value).replace("`", "").replace("\r", " ").replace("\n", " ")
 
 
 def make_report(case, display_name="", bio="", source_url=""):
