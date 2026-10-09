@@ -36,6 +36,19 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("&lt;script&gt;", page)
         self.assertIn("Baixar relatório Markdown", detail)
 
+    def test_profile_selector_uses_saved_cases(self):
+        now = timestamp()
+        self.db.execute(
+            "INSERT INTO cases(username,category,reason,status,created_at,updated_at) "
+            "VALUES(?,?,?,'new',?,?)",
+            ("perfil_teste", "other", "Descrição factual", now, now)
+        )
+        self.db.commit()
+        page = dashboard(self.db, "token").decode("utf-8")
+        self.assertIn('action="/prepare"', page)
+        self.assertIn('@perfil_teste', page)
+        self.assertIn("Selecionar perfil para revisão", page)
+
     def test_simulation_is_offline_only(self):
         result = simulate(10_000)
         self.assertTrue(result["passed"])
