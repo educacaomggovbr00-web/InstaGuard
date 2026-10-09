@@ -82,6 +82,26 @@ def dashboard(db, token, notice=""):
         "SELECT status, COUNT(*) FROM cases GROUP BY status"
     ).fetchall()))
     total = sum(counts.values())
+    selectable = [dict(row) for row in db.execute(
+        "SELECT id,username FROM cases ORDER BY id DESC"
+    )]
+    selection = "".join(
+        f'<option value="{item["id"]}">@{e(item["username"])} (caso #{item["id"]})</option>'
+        for item in selectable
+    )
+    picker = (
+        '<section class="panel"><h2>Selecionar perfil para revisão</h2>'
+        '<p>Escolha um caso cadastrado e prepare uma denúncia individual fundamentada. '
+        'Nenhum envio é automático.</p>'
+        '<form method="get" action="/prepare">'
+        '<label for="selected_case">Perfil cadastrado</label>'
+        '<select id="selected_case" name="case_id" required>'
+        + selection +
+        '</select><button type="submit">Preparar denúncia manual</button></form></section>'
+    ) if selectable else (
+        '<section class="panel"><h2>Selecionar perfil para revisão</h2>'
+        '<p>Cadastre um caso com fatos observados antes de selecionar um perfil.</p></section>'
+    )
     cards = "".join(
         f'<div class="case"><a href="/case/{item["id"]}">#{item["id"]} · @{e(item["username"])}</a>'
         f'<span class="pill">{e(item["status"])}</span><small>{e(item["category"])} · {e(item["reason"][:130])}</small></div>'
@@ -96,7 +116,7 @@ def dashboard(db, token, notice=""):
 <div class="stat"><span class="muted">Encerrados</span><b>{counts["closed"]}</b></div>
 </section><div class="grid"><div>
 <section class="panel"><h2>Casos recentes</h2>{cards}</section></div>
-<div><section class="panel"><h2>+ Novo caso</h2>
+<div>{picker}<section class="panel"><h2>+ Novo caso</h2>
 <form method="post" action="/cases"><input type="hidden" name="csrf" value="{token}">
 <label>Usuário do perfil</label><input name="username" placeholder="@perfil.exemplo" maxlength="31" required>
 <label>Categoria</label><select name="category">{select_options(CATEGORIES)}</select>
@@ -177,6 +197,12 @@ def create_handler(db_path, token):
                 try:
                     if path == "/":
                         self.respond(200, dashboard(db, token))
+                        return
+                    if path == "/prepare":
+                        candidate = parse_qs(urlparse(self.path).query).get("case_id", [""])[0]
+                        if not candidate.isascii() or not candidate.isdecimal():
+                            raise ValueError("Selecione um caso válido.")
+                        self.respond(200, prepare_page(db, int(candidate)))
                         return
                     parts = path.strip("/").split("/")
                     if len(parts) >= 2 and parts[0] == "case" and parts[1].isdigit():
