@@ -127,3 +127,15 @@ python -m unittest discover -s tests -v
 Os resultados verificam **integridade do banco SQLite**, referências órfãs, presença das tabelas essenciais e permissões de leitura por terceiros (em sistemas Unix/Termux). A auditoria é somente leitura, não imprime os casos, não altera arquivos e relata falhas sem fornecer dados pessoais. Um banco ainda não criado será informado como inexistente.
 
 **Proteção dos arquivos:** as exportações JSON de `instaguard.py export` e os relatórios de `report.py` são criados com permissões de acesso restrito nos sistemas compatíveis e não sobrescrevem arquivos existentes. A ferramenta não certifica segurança de serviços externos, não detecta todas as vulnerabilidades e não revela identidades privadas.
+
+## Painel web local (Android/Termux ou PC)
+
+Agora o InstaGuard tem uma interface escura, responsiva e sem dependências extras de Python.
+
+```bash
+python dashboard.py
+```
+
+Abra **http://127.0.0.1:8765/** no navegador **do mesmo dispositivo**. Você pode cadastrar casos, adicionar evidências por URL, acompanhar status manualmente, baixar um relatório Markdown e executar o teste de 10.000 eventos **fictícios**. Use `Ctrl+C` para encerrar.
+
+O servidor só escuta em `127.0.0.1`; ele não expõe uma interface pública, não consulta Instagram e não envia denúncias. Os dados ficam em `~/.instaguard/cases.db`. Não use o painel com dados de pessoas obtidos de forma indevida.
