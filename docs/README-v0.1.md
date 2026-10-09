@@ -72,3 +72,23 @@ python investigator.py @perfil.exemplo --display-name "Nome visível" --bio "Tex
 ```
 
 A saída JSON inclui os dados registrados, links no texto e algumas expressões que merecem revisão humana (ex.: promessas financeiras). Nenhum sinal é prova de fraude e a análise não provoca denúncias ou bloqueios. Evite incluir dados pessoais que não estejam disponíveis legitimamente.
+
+## Relatório de um caso — sem internet
+
+Após cadastrar um caso e registrar suas evidências, o gerador cria um documento Markdown com o andamento, dados públicos digitados por você, sinais textuais para revisão e a relação das evidências:
+
+```bash
+# Ver os IDs já cadastrados
+python instaguard.py list
+
+# Mostrar relatório no terminal (substitua 1 pelo ID do seu caso)
+python report.py 1
+
+# Adicionar dados públicos visíveis informados manualmente e salvar um arquivo novo
+python report.py 1 --display-name "Nome exibido" --bio "Texto público visível" --source "https://www.instagram.com/perfil.exemplo/" --output relatorio-caso-1.md
+
+# Executar testes automatizados
+python -m unittest discover -s tests -v
+```
+
+O relatório **não acessa redes sociais**, não investiga a identidade privada do proprietário, não atribui culpabilidade, não envia denúncias e não certifica a veracidade das informações inseridas. A identidade de quem criou ou administra o perfil é registrada como **não determinada**. O comando se recusa a sobrescrever um relatório existente e protege os arquivos de saída, quando o sistema suporta permissões Unix.
