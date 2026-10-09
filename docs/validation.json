@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "e06213b8b354a1a46cd7130123a8e901f3535460",
+  "scope": "local_evidence_preservation_and_defensive_audit",
+  "confirmed_facts": {
+    "local_python": "3.12",
+    "unit_tests_passed": 50,
+    "baseline_tests": 33,
+    "new_tests": 17,
+    "http_local_execution": "real_parser_and_handler_with_in_memory_streams",
+    "load_events_processed_locally": 10000,
+    "real_reports_sent": 0
+  },
+  "unverified_information": [
+    "The requester alleges unauthorized image use; no supporting evidence was supplied."
+  ],
+  "inconclusive_results": [
+    "No Instagram profile content or operator identity was verified.",
+    "Android/Termux hardware was not available for validation.",
+    "Remote CI results are tracked separately by commit in GitHub Actions."
+  ],
+  "limitations": [
+    "SHA-256 agreement proves byte correspondence, not content truth or authorship.",
+    "Evidence storage and SQLite are not encrypted or externally signed."
+  ]
+}

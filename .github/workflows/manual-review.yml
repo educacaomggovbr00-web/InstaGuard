@@ -1,0 +1,64 @@
+name: Preparar relato manual
+
+# Inicie pelo GitHub Actions > Run workflow.
+# Produz exatamente um pacote para revisão humana; nenhuma denúncia online.
+on:
+  workflow_dispatch:
+    inputs:
+      profile_url:
+        description: "URL HTTPS completa do perfil (um perfil por execução)"
+        required: true
+        type: string
+      category:
+        description: "Tipo de fato relatado"
+        required: true
+        type: choice
+        options:
+          - other
+          - impersonation
+          - scam
+          - spam
+      reason:
+        description: "Fatos observados, sem afirmações inventadas (visível aos colaboradores)"
+        required: true
+        type: string
+      evidence_urls:
+        description: "URLs HTTPS de evidências (opcional; uma por linha)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instaguard-manual-review-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  manual-review-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate one review package (no Instagram access)
+        env:
+          PROFILE_URL: ${{ inputs.profile_url }}
+          CATEGORY: ${{ inputs.category }}
+          REASON: ${{ inputs.reason }}
+          EVIDENCE_URLS: ${{ inputs.evidence_urls }}
+        run: |
+          python -m scripts.build_manual_package \
+            --profile-url "$PROFILE_URL" \
+            --category "$CATEGORY" \
+            --reason "$REASON" \
+            --evidence-urls "$EVIDENCE_URLS"
+      - name: Downloadable package for human review
+        uses: actions/upload-artifact@v4
+        with:
+          name: revisao-manual
+          path: manual-review-package/
+          if-no-files-found: error
+          retention-days: 1
