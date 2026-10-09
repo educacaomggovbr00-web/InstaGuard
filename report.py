@@ -5,6 +5,7 @@ Sem conexão com Instagram, busca de pessoas, automação de denúncias ou
 inferência da identidade de quem opera um perfil.
 """
 import argparse
+import json
 from pathlib import Path
 import re
 import sys
@@ -90,6 +91,43 @@ def make_report(case, display_name="", bio="", source_url=""):
     return "\n".join(lines)
 
 
+def make_json_report(case, display_name="", bio="", source_url=""):
+    """Structured offline review, with explicit uncertainty and source attribution."""
+    info = assess(
+        case["username"], display_name=display_name, bio=bio, source_url=source_url
+    )
+    return {
+        "schema_version": 1,
+        "generated_at_utc": timestamp(),
+        "mode": "offline_manual_review",
+        "case": {
+            "id": case["id"],
+            "username": case["username"],
+            "category": case["category"],
+            "status": case["status"],
+            "reason_claimed_by_operator": case["reason"],
+        },
+        "public_fields_supplied_manually": {
+            "display_name": display_name or None,
+            "bio": bio or None,
+            "source_url": source_url or None,
+            "independently_verified": False,
+        },
+        "review_indicators": info["review_indicators"],
+        "evidence_supplied_by_operator": case["evidence"],
+        "identity_of_profile_creator": {
+            "status": "unknown",
+            "note": "Nome de exibição não identifica quem criou ou controla uma conta."
+        },
+        "conclusion": "inconclusive",
+        "limitations": [
+            "Nenhuma verificação de Instagram ou serviço externo foi realizada.",
+            "Informações fornecidas manualmente não comprovam fraude ou autoria.",
+            "Nenhuma denúncia ou restrição de conta é executada.",
+        ],
+    }
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description="Gera relatório Markdown de um caso salvo, sem acesso à internet."
@@ -99,7 +137,8 @@ def main(argv=None):
     p.add_argument("--display-name", default="", help="Nome público fornecido manualmente")
     p.add_argument("--bio", default="", help="Biografia pública fornecida manualmente")
     p.add_argument("--source", default="", help="URL HTTPS de origem das informações")
-    p.add_argument("--output", help="Salvar em novo arquivo .md; sem --output, imprime na tela")
+    p.add_argument("--format", choices=("md", "json"), default="md", help="Formato do relatório")
+    p.add_argument("--output", help="Salvar em arquivo novo; sem --output, imprime na tela")
     args = p.parse_args(argv)
 
     try:
@@ -108,7 +147,13 @@ def main(argv=None):
             case = get_case(db, args.case_id)
         finally:
             db.close()
-        report = make_report(case, args.display_name, args.bio, args.source)
+        if args.format == "json":
+            report = json.dumps(
+                make_json_report(case, args.display_name, args.bio, args.source),
+                ensure_ascii=False, indent=2
+            ) + "\n"
+        else:
+            report = make_report(case, args.display_name, args.bio, args.source)
         if args.output:
             destination = Path(args.output).expanduser()
             if destination.resolve() == Path(args.db).expanduser().resolve():
