@@ -19,6 +19,11 @@ def safe_text(value):
     return re.sub(r"([\\\\`*_{}\[\]()#+.!|>~-])", r"\\\1", value).replace("\n", "  \n")
 
 
+def inline_code(value):
+    """Texto seguro em marcação inline sem alterar endereços URL."""
+    return str(value).replace("`", "").replace("\\r", " ").replace("\\n", " ")
+
+
 def make_report(case, display_name="", bio="", source_url=""):
     info = assess(
         case["username"],
@@ -27,6 +32,7 @@ def make_report(case, display_name="", bio="", source_url=""):
         source_url=source_url,
     )
     mark = safe_text
+    code = inline_code
     lines = [
         "# InstaGuard — relatório de revisão de perfil",
         "",
@@ -37,12 +43,12 @@ def make_report(case, display_name="", bio="", source_url=""):
         "## Perfil informado",
         "",
         f"- Usuário: `@{mark(info['username'])}`",
-        f"- Link do perfil: `{mark(info['profile_url'])}`",
+        f"- Link do perfil: `{code(info['profile_url'])}`",
         f"- Nome de exibição informado (não verificado): {mark(display_name) if display_name else 'Não informado'}",
         "- **Identidade de quem criou ou administra o perfil: não determinada.**",
         f"- Categoria cadastrada: {mark(case['category'])}",
         f"- Andamento do caso: {mark(case['status'])}",
-        f"- Fonte informada: `{mark(source_url)}`" if source_url else "- Fonte informada: nenhuma",
+        f"- Fonte informada: `{code(source_url)}`" if source_url else "- Fonte informada: nenhuma",
         "",
         "## Alegação registrada pelo operador",
         "",
@@ -59,7 +65,7 @@ def make_report(case, display_name="", bio="", source_url=""):
     if indicators:
         for indicator in indicators:
             lines.append(
-                f"- {mark(indicator['indicator'])}: trecho `{mark(indicator['excerpt'])}`"
+                f"- {mark(indicator['indicator'])}: trecho `{code(indicator['excerpt'])}`"
             )
     else:
         lines.append("Nenhum indicador textual encontrado nos dados fornecidos.")
@@ -67,7 +73,7 @@ def make_report(case, display_name="", bio="", source_url=""):
     if case["evidence"]:
         for index, evidence in enumerate(case["evidence"], 1):
             lines.append(
-                f"{index}. `{mark(evidence['url'])}` — {mark(evidence['description'])}"
+                f"{index}. `{code(evidence['url'])}` — {mark(evidence['description'])}"
             )
     else:
         lines.append("Nenhuma evidência cadastrada.")
