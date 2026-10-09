@@ -12,16 +12,16 @@ from urllib.parse import urlparse
 
 from instaguard import clean_username
 
-LINK_PATTERN = re.compile(r"https?://[^\\s]+", re.IGNORECASE)
+LINK_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 SUSPICIOUS_CLAIMS = (
     ("pedido de dinheiro", re.compile(
-        r"\\b(pix|transfer[eê]ncia|dep[oó]sito|manda(r)? dinheiro)\\b",
+        r"\b(pix|transfer[eê]ncia|dep[oó]sito|manda(r)? dinheiro)\b",
         re.IGNORECASE)),
     ("promessa financeira", re.compile(
-        r"\\b(lucro garantido|dinheiro f[aá]cil|renda garantida)\\b",
+        r"\b(lucro garantido|dinheiro f[aá]cil|renda garantida)\b",
         re.IGNORECASE)),
     ("pedido de credenciais", re.compile(
-        r"\\b(senha|c[oó]digo de verifica[cç][aã]o|c[oó]digo de login)\\b",
+        r"\b(senha|c[oó]digo de verifica[cç][aã]o|c[oó]digo de login)\b",
         re.IGNORECASE)),
 )
 
