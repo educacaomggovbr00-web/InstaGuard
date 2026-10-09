@@ -7,6 +7,7 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -41,11 +42,15 @@ def check_url(value):
 
 def connect(path):
     path = Path(path).expanduser()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        path.parent.chmod(0o700)
-    except OSError:
-        pass
+    parent_was_present = path.parent.exists()
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Nunca altere permissões de diretórios já existentes de terceiros
+    # (por exemplo, /tmp ou uma pasta escolhida pelo operador).
+    if not parent_was_present or path.parent == DEFAULT_DB.parent:
+        try:
+            path.parent.chmod(0o700)
+        except OSError:
+            pass
     connection = sqlite3.connect(str(path))
     connection.row_factory = sqlite3.Row
     connection.execute("""
@@ -204,15 +209,15 @@ def main(argv=None):
                 get_case(db, row["id"])
                 for row in db.execute("SELECT id FROM cases ORDER BY id")
             ]
-            output.write_text(
-                json.dumps({"exported_at": timestamp(), "cases": cases},
-                           ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            try:
-                output.chmod(0o600)
-            except OSError:
-                pass
+            # Criação exclusiva: não sobrescrever arquivos preexistentes.
+            # O modo privado é aplicado na abertura, não depois da escrita.
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            with os.fdopen(os.open(output, flags, 0o600), "w", encoding="utf-8") as handle:
+                json.dump(
+                    {"exported_at": timestamp(), "cases": cases},
+                    handle, ensure_ascii=False, indent=2,
+                )
+                handle.write("\n")
             print(f"Exported {len(cases)} case(s) to {output}.")
         return 0
     except (ValueError, OSError, sqlite3.Error) as exc:
